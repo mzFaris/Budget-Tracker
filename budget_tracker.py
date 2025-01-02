@@ -1,3 +1,4 @@
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton
 from pymongo import MongoClient
 import datetime
 
@@ -11,6 +12,19 @@ categories_collection = db["categories"]
 
 def main():
     ...
+    
+    
+def add_income(amount, category):
+    income = {"amount": amount, "category": category, "date": datetime.datetime.now()}
+    incomes_collection.insert_one(income)
+    
+    
+def add_expense(amount, category):
+    expense = {"amount": amount, "category": category, "date": datetime.datetime.now()}
+    expenses_collection.insert_one(expense)
+    
+    
+
     
     
 if __name__ == "__main__":
