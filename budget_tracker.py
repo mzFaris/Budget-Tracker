@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt
 from pymongo import MongoClient
@@ -35,8 +35,8 @@ class BudgetTrackerApp(QWidget):
         
         self.amount_input = QLineEdit(self)
         self.amount_input.setPlaceholderText("Enter amount")
-        self.category_input = QLineEdit(self)
-        self.category_input.setPlaceholderText("Enter category")
+        self.category_input = QComboBox(self)
+        self.update_category_dropdown()
         
         layout.addWidget(QLabel("Amount:"))
         layout.addWidget(self.amount_input)
@@ -51,6 +51,10 @@ class BudgetTrackerApp(QWidget):
         
         layout.addWidget(add_income_button)
         layout.addWidget(add_expense_button)
+        
+        self.category_name_input = QLineEdit(self)
+        self.category_name_input.setPlaceholderText("Enter category name")
+        layout.addWidget(self.category_name_input)
         
         monthly_report_button = QPushButton("View Monthly Report", self)
         monthly_report_button.clicked.connect(self.view_monthly_report)
@@ -76,15 +80,14 @@ class BudgetTrackerApp(QWidget):
     def add_income(self):
         try:
             amount = float(self.amount_input.text())
-            category = self.category_input.text()
+            category = self.category_input.currentText()
             if not category:
                 raise ValueError("Category cannot be empty.")
             
             add_income(amount, category)
             self.amount_input.clear()
-            self.category_input.clear()
-            QMessageBox.information(self, "Success", "Income added successfully!")
             self.update_balance()
+            QMessageBox.information(self, "Success", "Income added successfully!")
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
         
@@ -92,17 +95,21 @@ class BudgetTrackerApp(QWidget):
     def add_expense(self):
         try:
             amount = float(self.amount_input.text())
-            category = self.category_input.text()
+            category = self.category_input.currentText()
             if not category:
                 raise ValueError("Category cannot be empty.")
             
             add_expense(amount, category)
             self.amount_input.clear()
-            self.category_input.clear()
-            QMessageBox.information(self, "Success", "Expense added successfully!")
             self.update_balance()
+            QMessageBox.information(self, "Success", "Expense added successfully!")
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
+                
+            
+    def update_category_dropdown(self):
+        self.category_input.clear()
+        self.category_input.addItems([cat["name"] for cat in get_categories()])
             
             
     def view_monthly_report(self):
@@ -132,7 +139,7 @@ class BudgetTrackerApp(QWidget):
     def update_balance(self):
         total_income = sum(record["amount"] for record in incomes_collection.find())
         total_expense = sum(record["amount"] for record in expenses_collection.find())
-        balance = total_income- total_expense
+        balance = total_income - total_expense
         self.balance_label.setText(f"Balance: ${balance:.2f}")
     
     
@@ -144,6 +151,19 @@ def add_income(amount, category):
 def add_expense(amount, category):
     expense = {"amount": amount, "category": category, "date": datetime.datetime.now()}
     expenses_collection.insert_one(expense)
+    
+
+def add_category(name):
+    category = {"name": name}
+    categories_collection.insert_one(category)
+    
+    
+def delete_category(name):
+    categories_collection.delete_one({"name": name})
+    
+    
+def get_categories():
+    return list(categories_collection.find())
     
     
 def get_monthly_report(month, year):
