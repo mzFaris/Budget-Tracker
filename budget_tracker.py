@@ -10,16 +10,19 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QComboBox,
     QListWidget,
+    QListWidgetItem,
     QStackedWidget,
     QHBoxLayout,
+    QGroupBox,
 )
-from PyQt5.QtGui import QPixmap, QFont
+from PyQt5.QtGui import QPixmap, QFont, QIcon
 from PyQt5.QtCore import Qt
 from pymongo import MongoClient
 import datetime
 import sys
 import os
-
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 client = MongoClient("mongodb://localhost:27017")
 db = client["budgetTracker"]
@@ -28,19 +31,72 @@ expenses_collection = db["expenses"]
 categories_collection = db["categories"]
 
 
+def format_rupiah(amount):
+    return f"Rp {amount:,.2f}".replace(",", ".")
+
+
 class BudgetTrackerApp(QWidget):
     def __init__(self):
         super().__init__()
         self.initUI()
 
     def initUI(self):
+        self.setStyleSheet(
+            """
+            QWidget {
+                background-color: #f4f4f4;
+            }
+            QLabel {
+                font-family: Arial;
+                color: #333;
+            }
+            QPushButton {
+                background-color: #4CAF50; /* Green */
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049; /* Darker green */
+            }
+            QLineEdit, QComboBox {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QListWidget::item:selected {
+                background-color: #4CAF50; /* Green */
+                color: white;
+            }
+        """
+        )
+
         main_layout = QHBoxLayout()
 
         self.nav_menu = QListWidget()
-        self.nav_menu.addItem("Add Income/Expense")
-        self.nav_menu.addItem("View Monthly Report")
-        self.nav_menu.addItem("Transaction History")
+        self.nav_menu.addItem(
+            QListWidgetItem(QIcon("icon_income.png"), "Add Income/Expense")
+        )
+        self.nav_menu.addItem(
+            QListWidgetItem(QIcon("icon_report.png"), "View Monthly Report")
+        )
+        self.nav_menu.addItem(
+            QListWidgetItem(QIcon("icon_history.png"), "Transaction History")
+        )
+        self.nav_menu.setStyleSheet(
+            """
+            QListWidget {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QListWidget::item {
+                padding: 10px;
+            }
+        """
+        )
         self.nav_menu.currentRowChanged.connect(self.display_page)
+        self.nav_menu.setFixedWidth(200)
         main_layout.addWidget(self.nav_menu)
 
         self.pages = QStackedWidget()
@@ -48,10 +104,12 @@ class BudgetTrackerApp(QWidget):
         self.pages.addWidget(self.create_monthly_report_page())
         self.pages.addWidget(self.create_transaction_history_page())
         main_layout.addWidget(self.pages)
+        main_layout.setStretch(1, 3)  # Make the right side 3x wider than the left
 
         self.setLayout(main_layout)
         self.setWindowTitle("Budget Tracker")
-        self.resize(700, 500)
+        self.setWindowIcon(QIcon("icon_app.png"))
+        self.resize(800, 600)
         self.show()
 
     def create_add_income_expense_page(self):
@@ -63,34 +121,44 @@ class BudgetTrackerApp(QWidget):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+        form_group = QGroupBox("Add Transaction")
+        form_layout = QVBoxLayout()
+
         self.amount_input = QLineEdit(self)
         self.amount_input.setPlaceholderText("Enter amount")
         self.category_input = QComboBox(self)
         self.update_category_dropdown()
 
-        layout.addWidget(QLabel("Amount:"))
-        layout.addWidget(self.amount_input)
-        layout.addWidget(QLabel("Category:"))
-        layout.addWidget(self.category_input)
+        form_layout.addWidget(QLabel("Amount:"))
+        form_layout.addWidget(self.amount_input)
+        form_layout.addWidget(QLabel("Category:"))
+        form_layout.addWidget(self.category_input)
 
         add_income_button = QPushButton("Add Income", self)
+        add_income_button.setIcon(QIcon("icon_add_income.png"))
         add_income_button.clicked.connect(self.add_income)
-        layout.addWidget(add_income_button)
+        form_layout.addWidget(add_income_button)
 
         add_expense_button = QPushButton("Add Expense", self)
+        add_expense_button.setIcon(QIcon("icon_add_expense.png"))
         add_expense_button.clicked.connect(self.add_expense)
-        layout.addWidget(add_expense_button)
+        form_layout.addWidget(add_expense_button)
 
-        self.category_name_input = QLineEdit(self)
-        self.category_name_input.setPlaceholderText("Enter category name")
-        layout.addWidget(QLabel("New Category:"))
-        layout.addWidget(self.category_name_input)
+        # Section for adding a new category
+        self.new_category_input = QLineEdit(self)
+        self.new_category_input.setPlaceholderText("Enter new category")
+        form_layout.addWidget(QLabel("New Category:"))
+        form_layout.addWidget(self.new_category_input)
 
         add_category_button = QPushButton("Add Category", self)
+        add_category_button.setIcon(QIcon("icon_add_category.png"))
         add_category_button.clicked.connect(self.add_category)
-        layout.addWidget(add_category_button)
+        form_layout.addWidget(add_category_button)
 
-        self.balance_label = QLabel("Balance: $0.00")
+        form_group.setLayout(form_layout)
+        layout.addWidget(form_group)
+
+        self.balance_label = QLabel("Balance: Rp 0.00")
         self.balance_label.setFont(QFont("Arial", 14, QFont.Bold))
         self.balance_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.balance_label)
@@ -109,13 +177,30 @@ class BudgetTrackerApp(QWidget):
         layout.addWidget(title)
 
         monthly_report_button = QPushButton("View Monthly Report", self)
+        monthly_report_button.setIcon(QIcon("icon_report.png"))
         monthly_report_button.clicked.connect(self.view_monthly_report)
         layout.addWidget(monthly_report_button)
 
         self.report_table = QTableWidget()
         self.report_table.setColumnCount(3)
         self.report_table.setHorizontalHeaderLabels(["Date", "Category", "Amount"])
+        self.report_table.setStyleSheet(
+            """
+            QTableWidget {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+        """
+        )
         layout.addWidget(self.report_table)
+
+        # Add pie chart for income and expense
+        self.pie_chart_canvas = FigureCanvas(Figure(figsize=(5, 3)))
+        layout.addWidget(self.pie_chart_canvas)
 
         page.setLayout(layout)
         return page
@@ -134,9 +219,22 @@ class BudgetTrackerApp(QWidget):
         self.transaction_history_table.setHorizontalHeaderLabels(
             ["Date", "Category", "Amount"]
         )
+        self.transaction_history_table.setStyleSheet(
+            """
+            QTableWidget {
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QTableWidget::item {
+                padding: 5px;
+            }
+        """
+        )
         layout.addWidget(self.transaction_history_table)
 
         view_history_button = QPushButton("View Transaction History", self)
+        view_history_button.setIcon(QIcon("icon_history.png"))
         view_history_button.clicked.connect(self.view_transaction_history)
         layout.addWidget(view_history_button)
 
@@ -174,19 +272,25 @@ class BudgetTrackerApp(QWidget):
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
 
-    def update_category_dropdown(self):
-        self.category_input.clear()
-        self.category_input.addItems([cat["name"] for cat in get_categories()])
-
     def add_category(self):
-        name = self.category_name_input.text()
+        name = self.new_category_input.text()
         if name:
             add_category(name)
-            self.category_name_input.clear()
+            self.new_category_input.clear()
             self.update_category_dropdown()
             QMessageBox.information(self, "Success", "Category added successfully!")
         else:
             QMessageBox.warning(self, "Error", "Category name cannot be empty.")
+
+    def update_category_dropdown(self):
+        self.category_input.clear()
+        self.category_input.addItems([cat["name"] for cat in get_categories()])
+
+    def update_balance(self):
+        total_income = sum(record["amount"] for record in incomes_collection.find())
+        total_expense = sum(record["amount"] for record in expenses_collection.find())
+        balance = total_income - total_expense
+        self.balance_label.setText(f"Balance: {format_rupiah(balance)}")
 
     def view_monthly_report(self):
         month = datetime.datetime.now().month
@@ -205,17 +309,28 @@ class BudgetTrackerApp(QWidget):
                 row_count, 1, QTableWidgetItem(record["category"])
             )
             self.report_table.setItem(
-                row_count, 2, QTableWidgetItem(f"{record["amount"]:.2f}")
+                row_count, 2, QTableWidgetItem(format_rupiah(record["amount"]))
             )
             row_count += 1
 
         self.update_balance()
+        self.update_pie_chart(report["total_income"], report["total_expense"])
 
         QMessageBox.information(
             self,
             "Monthly Report",
-            f"Total Income: {report["total_income"]}\nTotal Expense: {report["total_expense"]}",
+            f"Total Income: {format_rupiah(report["total_income"])}\nTotal Expense: {format_rupiah(report["total_expense"])}",
         )
+
+    def update_pie_chart(self, income, expense):
+        ax = self.pie_chart_canvas.figure.subplots()
+        ax.clear()
+        labels = ["Income", "Expenses"]
+        sizes = [income, expense]
+        colors = ["#4CAF50", "#FF6347"]  # Green for income, red for expenses
+        ax.pie(sizes, labels=labels, colors=colors, autopct="%1.1f%%", startangle=140)
+        ax.set_title("Income vs Expenses")
+        self.pie_chart_canvas.draw()
 
     def view_transaction_history(self):
         records = list(incomes_collection.find()) + list(expenses_collection.find())
@@ -232,16 +347,11 @@ class BudgetTrackerApp(QWidget):
                 row_count, 1, QTableWidgetItem(record["category"])
             )
             self.transaction_history_table.setItem(
-                row_count, 2, QTableWidgetItem(f"{record['amount']:.2f}")
+                row_count, 2, QTableWidgetItem(format_rupiah(record["amount"]))
             )
 
-    def update_balance(self):
-        total_income = sum(record["amount"] for record in incomes_collection.find())
-        total_expense = sum(record["amount"] for record in expenses_collection.find())
-        balance = total_income - total_expense
-        self.balance_label.setText(f"Balance: ${balance:.2f}")
 
-
+# Helper functions for database operations
 def add_income(amount, category):
     income = {"amount": amount, "category": category, "date": datetime.datetime.now()}
     incomes_collection.insert_one(income)
