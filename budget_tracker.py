@@ -104,7 +104,7 @@ class BudgetTrackerApp(QWidget):
         self.pages.addWidget(self.create_monthly_report_page())
         self.pages.addWidget(self.create_transaction_history_page())
         main_layout.addWidget(self.pages)
-        main_layout.setStretch(1, 3)  # Make the right side 3x wider than the left
+        main_layout.setStretch(1, 3)
 
         self.setLayout(main_layout)
         self.setWindowTitle("Budget Tracker")
@@ -144,7 +144,6 @@ class BudgetTrackerApp(QWidget):
         add_expense_button.clicked.connect(self.add_expense)
         form_layout.addWidget(add_expense_button)
 
-        # Section for adding a new category
         self.new_category_input = QLineEdit(self)
         self.new_category_input.setPlaceholderText("Enter new category")
         form_layout.addWidget(QLabel("New Category:"))
@@ -198,7 +197,6 @@ class BudgetTrackerApp(QWidget):
         )
         layout.addWidget(self.report_table)
 
-        # Add pie chart for income and expense
         self.pie_chart_canvas = FigureCanvas(Figure(figsize=(5, 3)))
         layout.addWidget(self.pie_chart_canvas)
 
@@ -351,7 +349,6 @@ class BudgetTrackerApp(QWidget):
             )
 
 
-# Helper functions for database operations
 def add_income(amount, category):
     income = {"amount": amount, "category": category, "date": datetime.datetime.now()}
     incomes_collection.insert_one(income)
