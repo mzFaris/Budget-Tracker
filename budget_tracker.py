@@ -54,8 +54,13 @@ class BudgetTrackerApp(QWidget):
         
         self.category_name_input = QLineEdit(self)
         self.category_name_input.setPlaceholderText("Enter category name")
+        layout.addWidget(QLabel("New Category:"))
         layout.addWidget(self.category_name_input)
         
+        add_category_button = QPushButton("Add Category", self)
+        add_category_button.clicked.connect(self.add_category)
+        layout.addWidget(add_category_button)
+
         monthly_report_button = QPushButton("View Monthly Report", self)
         monthly_report_button.clicked.connect(self.view_monthly_report)
         layout.addWidget(monthly_report_button)
@@ -110,8 +115,17 @@ class BudgetTrackerApp(QWidget):
     def update_category_dropdown(self):
         self.category_input.clear()
         self.category_input.addItems([cat["name"] for cat in get_categories()])
-            
-            
+
+    def add_category(self):
+        name = self.category_name_input.text()
+        if name:
+            add_category(name)
+            self.category_name_input.clear()
+            self.update_category_dropdown()
+            QMessageBox.information(self, "Success", "Category added successfully!")
+        else:
+            QMessageBox.warning(self, "Error", "Category name cannot be empty.")
+
     def view_monthly_report(self):
         month = datetime.datetime.now().month
         year = datetime.datetime.now().year
