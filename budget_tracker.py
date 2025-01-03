@@ -56,6 +56,12 @@ class BudgetTrackerApp(QWidget):
         monthly_report_button.clicked.connect(self.view_monthly_report)
         layout.addWidget(monthly_report_button)
         
+        self.balance_label = QLabel("Balance: $0.00")
+        self.balance_label.setFont(QFont("Arial", 14, QFont.Bold))
+        self.balance_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(self.balance_label)
+        self.update_balance()
+        
         self.report_table = QTableWidget()
         self.report_table.setColumnCount(3)
         self.report_table.setHorizontalHeaderLabels(["Date", "Category", "Amount"])
@@ -78,6 +84,7 @@ class BudgetTrackerApp(QWidget):
             self.amount_input.clear()
             self.category_input.clear()
             QMessageBox.information(self, "Success", "Income added successfully!")
+            self.update_balance()
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
         
@@ -93,6 +100,7 @@ class BudgetTrackerApp(QWidget):
             self.amount_input.clear()
             self.category_input.clear()
             QMessageBox.information(self, "Success", "Expense added successfully!")
+            self.update_balance()
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
             
@@ -112,11 +120,20 @@ class BudgetTrackerApp(QWidget):
             self.report_table.setItem(row_count, 2, QTableWidgetItem(f"{record["amount"]:.2f}"))
             row_count += 1
             
+        self.update_balance()
+            
         QMessageBox.information(
             self,
             "Monthly Report",
             f"Total Income: {report["total_income"]}\nTotal Expense: {report["total_expense"]}",
         )
+        
+    
+    def update_balance(self):
+        total_income = sum(record["amount"] for record in incomes_collection.find())
+        total_expense = sum(record["amount"] for record in expenses_collection.find())
+        balance = total_income- total_expense
+        self.balance_label.setText(f"Balance: ${balance:.2f}")
     
     
 def add_income(amount, category):
