@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem, QMessageBox, QComboBox, QListWidget, QStackedWidget, QHBoxLayout
 from PyQt5.QtGui import QPixmap, QFont
 from PyQt5.QtCore import Qt
 from pymongo import MongoClient
@@ -21,14 +21,32 @@ class BudgetTrackerApp(QWidget):
         
     
     def initUI(self):
+        main_layout = QHBoxLayout()
+        
+        self.nav_menu = QListWidget()
+        self.nav_menu.addItem("Add Income/Expense")
+        self.nav_menu.addItem("View Monthly Report")
+        self.nav_menu.addItem("Transaction History")
+        self.nav_menu.currentRowChanged.connect(self.display_page)
+        main_layout.addWidget(self.nav_menu)
+        
+        self.pages = QStackedWidget()
+        self.pages.addWidget(self.create_add_income_expense_page())
+        self.pages.addWidget(self.create_monthly_report_page())
+        self.pages.addWidget(self.create_transaction_history_page())
+        main_layout.addWidget(self.pages)
+        
+        self.setLayout(main_layout)
+        self.setWindowTitle("Budget Tracker")
+        self.resize(700, 500)
+        self.show()
+        
+    
+    def create_add_income_expense_page(self):
+        page = QWidget()
         layout = QVBoxLayout()
         
-        # self.logo = QLabel(self)
-        # pixmap = QPixmap("img\\MacBook Pro 14_ - 1.png")
-        # self.logo.setPixmap(pixmap)
-        # layout.addWidget(self.logo)
-        
-        title = QLabel("Personal Budget Tracker")
+        title = QLabel("Add Income/Expense")
         title.setFont(QFont("Arial", 18, QFont.Bold))
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
@@ -45,11 +63,10 @@ class BudgetTrackerApp(QWidget):
         
         add_income_button = QPushButton("Add Income", self)
         add_income_button.clicked.connect(self.add_income)
+        layout.addWidget(add_income_button)
         
         add_expense_button = QPushButton("Add Expense", self)
-        add_expense_button.clicked.connect(self.add_expense)
-        
-        layout.addWidget(add_income_button)
+        add_expense_button.clicked.connect(self.add_expense)        
         layout.addWidget(add_expense_button)
         
         self.category_name_input = QLineEdit(self)
@@ -60,28 +77,65 @@ class BudgetTrackerApp(QWidget):
         add_category_button = QPushButton("Add Category", self)
         add_category_button.clicked.connect(self.add_category)
         layout.addWidget(add_category_button)
-
-        monthly_report_button = QPushButton("View Monthly Report", self)
-        monthly_report_button.clicked.connect(self.view_monthly_report)
-        layout.addWidget(monthly_report_button)
         
         self.balance_label = QLabel("Balance: $0.00")
         self.balance_label.setFont(QFont("Arial", 14, QFont.Bold))
         self.balance_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self.balance_label)
-        self.update_balance()
+        self.update_balance() 
+        
+        page.setLayout(layout)
+        return page
+    
+    
+    def create_monthly_report_page(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        
+        title = QLabel("Monthly Report")
+        title.setFont(QFont("Arial", 18, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        monthly_report_button = QPushButton("View Monthly Report", self)
+        monthly_report_button.clicked.connect(self.view_monthly_report)
+        layout.addWidget(monthly_report_button)
         
         self.report_table = QTableWidget()
         self.report_table.setColumnCount(3)
         self.report_table.setHorizontalHeaderLabels(["Date", "Category", "Amount"])
         layout.addWidget(self.report_table)
         
-        self.setLayout(layout)
-        self.setWindowTitle("Budget Tracker")
-        self.resize(500, 400)
-        self.show()
-        
+        page.setLayout(layout)
+        return page
     
+    
+    def create_transaction_history_page(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        
+        title = QLabel("Transaction History")
+        title.setFont(QFont("Arial", 18, QFont.Bold))
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+    
+        self.transaction_history_table = QTableWidget()
+        self.transaction_history_table.setColumnCount(3)
+        self.transaction_history_table.setHorizontalHeaderLabels(["Date", "Category", "Amount"])
+        layout.addWidget(self.transaction_history_table)
+        
+        view_history_button = QPushButton("View Transaction History", self)
+        view_history_button.clicked.connect(self.view_transaction_history)
+        layout.addWidget(view_history_button)
+        
+        page.setLayout(layout)
+        return page
+    
+    
+    def display_page(self, index):
+        self.pages.setCurrentIndex(index)
+        
+        
     def add_income(self):
         try:
             amount = float(self.amount_input.text())
@@ -95,8 +149,8 @@ class BudgetTrackerApp(QWidget):
             QMessageBox.information(self, "Success", "Income added successfully!")
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
-        
-        
+    
+    
     def add_expense(self):
         try:
             amount = float(self.amount_input.text())
@@ -110,7 +164,7 @@ class BudgetTrackerApp(QWidget):
             QMessageBox.information(self, "Success", "Expense added successfully!")
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {e}")
-                
+
             
     def update_category_dropdown(self):
         self.category_input.clear()
@@ -149,12 +203,28 @@ class BudgetTrackerApp(QWidget):
             f"Total Income: {report["total_income"]}\nTotal Expense: {report["total_expense"]}",
         )
         
+        
+    def view_transaction_history(self):
+        records = list(incomes_collection.find()) + list(expenses_collection.find())
+        
+        self.transaction_history_table.setRowCount(0)
+        row_count = 0
+        
+        for record in records:
+            self.transaction_history_table.insertRow(row_count)
+            self.transaction_history_table.setItem(row_count, 0, QTableWidgetItem(record["date"].strftime("%Y=%m-%d")))
+            self.transaction_history_table.setItem(row_count, 1, QTableWidgetItem(record["category"]))
+            self.transaction_history_table.setItem(row_count, 2, QTableWidgetItem(f"{record['amount']:.2f}"))
+            
     
     def update_balance(self):
         total_income = sum(record["amount"] for record in incomes_collection.find())
         total_expense = sum(record["amount"] for record in expenses_collection.find())
         balance = total_income - total_expense
         self.balance_label.setText(f"Balance: ${balance:.2f}")
+        
+        
+   
     
     
 def add_income(amount, category):
